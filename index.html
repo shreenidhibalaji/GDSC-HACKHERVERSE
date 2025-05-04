@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SpeechTranscribe</title>
+
+  <!-- Google Font: Poppins -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap" rel="stylesheet">
+  
+  <!-- External CSS -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Confetti and jsPDF Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/uuid@9.0.0/dist/umd/uuidv4.min.js"></script>
+</head>
+<body>
+  <div class="mode-toggle">
+    <label class="switch">
+      <input type="checkbox" id="modeToggle">
+      <span class="slider round"></span>
+    </label>
+    <span id="modeLabel">Dark Mode</span>
+  </div>
+
+  <div class="container">
+    <h1 style="font-family: 'Poppins', sans-serif;">Speech to Text Dictation App</h1>
+
+    <select id="language">
+        <option value="en-IN">English (India)</option>
+        <option value="hi-IN">Hindi (हिन्दी)</option>
+        <option value="ta-IN">Tamil (தமிழ்)</option>
+        <option value="es-ES">Spanish (Español)</option>
+    </select>
+    
+    <div class="btn-group">
+      <button class="glow-btn" onclick="startDictation()">🎤 Start Dictation</button>
+      <button class="glow-btn" onclick="stopDictation()">🛑 Stop</button>
+    </div>
+
+    <textarea id="transcript" placeholder="Your transcription will appear here..."></textarea>
+
+    <div class="actions">
+      <button class="glow-btn" onclick="saveAsTxt()">💾 Save as TXT</button>
+      <button class="glow-btn" onclick="saveAsPDF()">🧾 Save as PDF</button>
+      <button class="glow-btn" onclick="emailTranscript()">📧 Email Transcript</button>
+    </div>
+
+    <div class="share-buttons">
+      <button onclick="shareTranscript()">🔗 Share</button>
+    </div>
+
+    <div id="historyContainer">
+      <h2>Past Transcriptions</h2>
+      <ul id="historyList"></ul>
+    </div>
+
+    <div class="music-toggle">
+      <label>
+        <input type="checkbox" id="musicSwitch" />
+        Play Music
+      </label>
+    </div>
+    <audio id="backgroundMusic" loop>
+      <source src="https://www.bensound.com/bensound-music/bensound-sunny.mp3" type="audio/mpeg" />
+    </audio>
+  </div>
+  <div class="history-container">
+    <button class="clear-history-button" onclick="clearHistory()">Clear History</button>
+    <div id="history-list"></div>
+  </div>
+  
+
+  <!-- Speaking Icon -->
+  <div id="speakingIcon" style="position: fixed; bottom: 20px; right: 20px; display: none;">
+    <img src="https://media.giphy.com/media/3EAKxfUBZ4DFeFfWJq/giphy.gif" alt="Speaking Icon" style="width: 50px; height: 50px;"/>
+  </div>
+
+  <!-- Feature Support Scripts -->
+  <script src="script.js"></script>
+  <script src="features/theme.js"></script>
+  <script src="features/translation.js"></script>
+  <script src="features/voiceFeedback.js"></script>
+  <script src="features/smartCommands.js"></script>
+  <script src="features/history.js"></script>
+  <script src="features/export.js"></script>
+  <script src="features/sharing.js"></script>
+  <script src="features/autoPunctuation.js"></script>
+  <script src="features/avatars.js"></script>
+  <script src="features/keywordHighlight.js"></script>
+  <script src="features/plugins.js"></script>
+  <script src="features/analytics.js"></script>
+
+  <script>
+    let recognition;
+    let isDictating = false;
+
+    // Start Dictation
+    function startDictation() {
+      isDictating = true;
+      const transcriptElement = document.getElementById("transcript");
+      const speakingIcon = document.getElementById("speakingIcon");
+
+      // Show speaking icon
+      speakingIcon.style.display = "block";
+
+      // Initialize Speech Recognition
+      if (!('webkitSpeechRecognition' in window)) {
+        alert("Speech Recognition is not supported in this browser.");
+      } else {
+        recognition = new webkitSpeechRecognition();
+        recognition.continuous = true;
+        recognition.lang = document.getElementById("language").value;
+
+        recognition.onresult = function(event) {
+          let transcript = event.results[event.resultIndex][0].transcript;
+          transcriptElement.value = transcript;
+          speakText(transcript);  // Speak the transcribed text
+        };
+
+        recognition.start();
+      }
+    }
+
+    // Stop Dictation
+    function stopDictation() {
+      isDictating = false;
+      recognition.stop();
+      document.getElementById("speakingIcon").style.display = "none";
+    }
+
+    // Speak the Text
+    function speakText(text) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = document.getElementById("language").value;
+      if (window.speechSynthesis) {
+        window.speechSynthesis.speak(utterance);
+      } else {
+        console.log("Speech synthesis not supported.");
+      }
+    }
+
+    // Save as PDF Function
+    function saveAsPDF() {
+      const transcript = document.getElementById("transcript").value;
+      const doc = new jsPDF();
+      doc.text(transcript, 10, 10);
+      doc.save("transcript.pdf");
+    }
+
+    // Save as TXT Function
+    function saveAsTxt() {
+      const transcript = document.getElementById("transcript").value;
+      const blob = new Blob([transcript], { type: 'text/plain' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'transcript.txt';
+      link.click();
+    }
+
+    // Share Transcript Function
+    function shareTranscript() {
+      const transcript = document.getElementById("transcript").value;
+      navigator.clipboard.writeText(transcript).then(function() {
+        alert('Transcript copied to clipboard. You can now share it!');
+      }).catch(function(error) {
+        alert('Failed to copy text: ' + error);
+      });
+    }
+
+
+  </script>
+</body>
+</html>

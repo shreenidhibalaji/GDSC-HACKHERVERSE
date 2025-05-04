@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gemini Voice Assistant</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500&display=swap');
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Orbitron', sans-serif;
+      background: linear-gradient(135deg, #0f0f0f, #1c1c1c);
+      color: #f1f1f1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+      animation: fadeIn 1.5s ease-out;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #00ffe7;
+      text-shadow: 0 0 8px #00ffe7, 0 0 20px #00ffe7;
+      margin-bottom: 20px;
+      animation: slideDown 1s ease-out;
+    }
+
+    #output {
+      margin: 20px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid #00ffe7;
+      border-radius: 12px;
+      box-shadow: 0 0 25px #00ffe755, 0 0 40px #00ffe722 inset;
+      width: 90%;
+      max-width: 650px;
+      font-size: 18px;
+      color: #ffffffcc;
+      backdrop-filter: blur(10px);
+      animation: fadeInUp 1.2s ease-out;
+    }
+
+    button {
+      padding: 14px 28px;
+      margin: 10px;
+      font-size: 16px;
+      border: none;
+      border-radius: 12px;
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 1px;
+      cursor: pointer;
+      position: relative;
+      z-index: 1;
+      transition: 0.4s ease;
+      animation: fadeInUp 1s ease forwards;
+    }
+
+    button::before {
+      content: '';
+      position: absolute;
+      top: -2px; left: -2px;
+      right: -2px; bottom: -2px;
+      background: linear-gradient(45deg, #00ffe7, #ff00ff, #00ffe7, #ff00ff);
+      background-size: 400% 400%;
+      border-radius: 14px;
+      z-index: -1;
+      filter: blur(6px);
+      opacity: 0.6;
+      animation: glow 6s linear infinite;
+    }
+
+    #askButton { background-color: #000000; color: #00ffe7; }
+    #pauseButton { background-color: #000000; color: #ff9f1a; }
+    #stopButton { background-color: #000000; color: #ff3860; }
+
+    #askButton:hover, #pauseButton:hover, #stopButton:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 18px #00ffe7aa;
+    }
+
+    @keyframes glow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes fadeInUp {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideDown {
+      0% { opacity: 0; transform: translateY(-30px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+<h1>🧠 Voice Assistant</h1>
+<div>
+  <button id="askButton" onclick="startListening()">🎤 Ask</button>
+  <button id="pauseButton" onclick="pauseSpeech()">⏸️ Pause</button>
+  <button id="stopButton" onclick="stopSpeech()">⏹️ Stop</button>
+</div>
+<div id="output">Click "Ask" and speak your question.</div>
+
+<script>
+  const API_KEY = "AIzaSyCd-q0JsJesDPKABzzP7_ZycLMucijeR48";
+  const outputDiv = document.getElementById('output');
+  const synth = window.speechSynthesis;
+  let currentUtterance = null;
+
+  async function fetchGeminiAnswer(prompt) {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }]
+      })
+    });
+
+    const data = await res.json();
+    const answer = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    return answer || "⚠️ Sorry, I couldn’t find anything useful.";
+  }
+
+  function startListening() {
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-IN';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.start();
+
+    recognition.onresult = async function(event) {
+      const spokenText = event.results[0][0].transcript;
+      outputDiv.innerHTML = `<b style="color:#00ffe7;">You said:</b> ${spokenText}<br><b style="color:#ff9f1a;">Assistant:</b> 🔄 Thinking...`;
+
+      const response = await fetchGeminiAnswer(spokenText);
+      outputDiv.innerHTML = `<b style="color:#00ffe7;">You said:</b> ${spokenText}<br><b style="color:#ff9f1a;">Assistant:</b> ${response}`;
+      speakAnswer(response);
+    };
+
+    recognition.onerror = function(event) {
+      outputDiv.innerHTML = `<b style="color:red;">Error:</b> ${event.error}`;
+    };
+  }
+
+  function speakAnswer(text) {
+  // Cancel any ongoing speech
+  if (synth.speaking || synth.pending) {
+    synth.cancel();
+  }
+
+  // Ensure text exists
+  if (!text || text.trim() === "") return;
+
+  // Create and speak the response
+  currentUtterance = new SpeechSynthesisUtterance(text);
+  currentUtterance.lang = 'en-US';
+  currentUtterance.pitch = 1;
+  currentUtterance.rate = 1;
+  synth.speak(currentUtterance);
+}
+
+
+  function pauseSpeech() {
+    if (synth.speaking && !synth.paused) {
+      synth.pause();
+    } else if (synth.paused) {
+      synth.resume();
+    }
+  }
+
+  function stopSpeech() {
+    if (synth.speaking) {
+      synth.cancel();
+    }
+  }
+</script>
+
+</body>
+</html>
